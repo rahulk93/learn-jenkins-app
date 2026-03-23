@@ -5,7 +5,7 @@ pipeline {
 
         stage('Build Docker image') {
             steps {
-                sh 'docker build -t my-playwright .'
+                sh 'docker build -f ci/Dockerfile -t my-playwright .'
             }
         }
     }
