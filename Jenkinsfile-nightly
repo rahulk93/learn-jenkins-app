@@ -3,9 +3,10 @@ pipeline {
 
     stages {
 
-        stage('Build Docker image') {
+        stage('Build Docker images') {
             steps {
-                sh 'docker build -f ci/Dockerfile -t my-playwright .'
+                sh 'docker build -f ci/Dockerfile-playwright -t my-playwright .'
+                sh 'docker build -f ci/Dockerfile-aws-cli -t my-aws-cli .'
             }
         }
     }
