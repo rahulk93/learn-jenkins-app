@@ -2,13 +2,13 @@ pipeline {
     agent any
 
     environment {
-        REACT_APP_VERSION   = "1.0.${BUILD_ID}"
-        APP_NAME = 'learnjenkinsapp'
-        AWS_DEFAULT_REGION  = 'ap-southeast-2'
-        AWS_ECS_CLUSTER     = 'LearnJenkinsApp-Cluster-20260316'
+        REACT_APP_VERSION    = "1.0.${BUILD_ID}"
+        APP_NAME             = 'learnjenkinsapp'
+        AWS_DEFAULT_REGION   = 'ap-southeast-2'
+        AWS_ECS_CLUSTER      = 'LearnJenkinsApp-Cluster-20260316'
         AWS_ECS_SERVICE_PROD = 'LearnJenkinsApp-Service-Prod'
-        AWS_ECS_TD_PROD     = 'LearnJenkinsApp-TaskDefinition-Prod'
-        IMAGE_NAME          = 'myjenkinsapp'
+        AWS_ECS_TD_PROD      = 'LearnJenkinsApp-TaskDefinition-Prod'
+        IMAGE_NAME           = 'myjenkinsapp'
     }
 
     stages {
@@ -38,13 +38,7 @@ pipeline {
                 sh '''
                     set -e
                     docker version
-                    docker build -t ${IMAGE_NAME}:latest .
-                '''
-            }
-
-            steps {
-                sh '''
-                    docker build -t $APP_NAME:$REACT_APP_VERSION .
+                    docker build -t ${APP_NAME}:${REACT_APP_VERSION} -t ${IMAGE_NAME}:latest .
                 '''
             }
         }
