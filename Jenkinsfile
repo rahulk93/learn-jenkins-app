@@ -1,19 +1,24 @@
 pipeline {
     agent any
 
+    options {
+        timestamps()
+    }
+
     environment {
-        REACT_APP_VERSION = "1.0.$BUILD_ID" 
+        REACT_APP_VERSION = "1.0.${BUILD_ID}"
         APP_NAME = 'learnjenkinsapp'
         AWS_DEFAULT_REGION = 'ap-southeast-2'
         AWS_DOCKER_REGISTRY = '143555788014.dkr.ecr.ap-southeast-2.amazonaws.com'
         AWS_ECS_CLUSTER = 'LearnJenkinsApp-Cluster-20260316'
         AWS_ECS_SERVICE_PROD = 'LearnJenkinsApp-Service-Prod'
         AWS_ECS_TD_PROD = 'LearnJenkinsApp-TaskDefinition-Prod'
+        IMAGE_URI = "${AWS_DOCKER_REGISTRY}/${APP_NAME}:${REACT_APP_VERSION}"
     }
 
     stages {
 
-        stage('Build') {
+        stage('Build React App') {
             agent {
                 docker {
                     image 'node:18-alpine'
@@ -22,55 +27,93 @@ pipeline {
             }
             steps {
                 sh '''
-                    ls -la
+                    set -eux
                     node --version
                     npm --version
                     npm ci
                     npm run build
-                    ls -la
+                    test -d build
                 '''
             }
         }
 
-        stage('Build Docker image') {
+        stage('Build and Push Docker Image') {
             agent {
                 docker {
-                    image 'my-aws-cli'
+                    image 'docker:26-cli'
                     reuseNode true
-                    args "-u root -v /var/run/docker.sock:/var/run/docker.sock --entrypoint=''"
+                    args '-u root -v /var/run/docker.sock:/var/run/docker.sock'
                 }
             }
-
             steps {
-                withCredentials([usernamePassword(credentialsId: 'my-aws', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')]) {
+                withCredentials([usernamePassword(
+                    credentialsId: 'my-aws',
+                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
                     sh '''
-                        docker build -t $AWS_DOCKER_REGISTRY/$APP_NAME:$REACT_APP_VERSION .
-                        aws ecr get-login-password | docker login --username AWS --password-stdin $AWS_DOCKER_REGISTRY
-                        docker push $AWS_DOCKER_REGISTRY/$APP_NAME:$REACT_APP_VERSION
-                    '''
-                }
-            }
-        }        
+                        set -eux
 
-        stage('Deploy to AWS') {
-            agent {
-                docker {
-                    image 'my-aws-cli'
-                    reuseNode true
-                    args "--entrypoint=''"
-                }
-            }
+                        apk add --no-cache python3 py3-pip bash
+                        pip3 install --no-cache-dir awscli
 
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'my-aws', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')]) {
-                    sh '''
                         aws --version
-                        LATEST_TD_REVISION=$(aws ecs register-task-definition --cli-input-json file://aws/task-definition-prod.json | jq '.taskDefinition.revision')
-                        aws ecs update-service --cluster $AWS_ECS_CLUSTER --service $AWS_ECS_SERVICE_PROD --task-definition $AWS_ECS_TD_PROD:$LATEST_TD_REVISION
-                        aws ecs wait services-stable --cluster $AWS_ECS_CLUSTER --services $AWS_ECS_SERVICE_PROD
+                        docker version
+
+                        aws ecr get-login-password --region "$AWS_DEFAULT_REGION" \
+                          | docker login --username AWS --password-stdin "$AWS_DOCKER_REGISTRY"
+
+                        docker build -t "$IMAGE_URI" .
+                        docker push "$IMAGE_URI"
                     '''
                 }
             }
-        }        
+        }
+
+        stage('Render Task Definition') {
+            steps {
+                sh '''
+                    set -eux
+                    cp aws/task-definition-prod.json aws/task-definition-rendered.json
+                    sed -i "s|__IMAGE__|$IMAGE_URI|g" aws/task-definition-rendered.json
+                    cat aws/task-definition-rendered.json
+                '''
+            }
+        }
+
+        stage('Deploy to AWS ECS') {
+            agent {
+                docker {
+                    image 'amazon/aws-cli:2'
+                    reuseNode true
+                    args '--entrypoint=""'
+                }
+            }
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'my-aws',
+                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
+                    sh '''
+                        set -eux
+
+                        LATEST_TD_REVISION=$(aws ecs register-task-definition \
+                          --cli-input-json file://aws/task-definition-rendered.json \
+                          --query 'taskDefinition.revision' \
+                          --output text)
+
+                        aws ecs update-service \
+                          --cluster "$AWS_ECS_CLUSTER" \
+                          --service "$AWS_ECS_SERVICE_PROD" \
+                          --task-definition "$AWS_ECS_TD_PROD:$LATEST_TD_REVISION"
+
+                        aws ecs wait services-stable \
+                          --cluster "$AWS_ECS_CLUSTER" \
+                          --services "$AWS_ECS_SERVICE_PROD"
+                    '''
+                }
+            }
+        }
     }
 }
