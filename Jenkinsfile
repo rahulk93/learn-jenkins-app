@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        REACT_APP_VERSION = "1.0.$BUILD_ID"
+        REACT_APP_VERSION = "1.0.$BUILD_ID" 
         APP_NAME = 'learnjenkinsapp'
         AWS_DEFAULT_REGION = 'ap-southeast-2'
         AWS_DOCKER_REGISTRY = '143555788014.dkr.ecr.ap-southeast-2.amazonaws.com'
