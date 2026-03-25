@@ -103,18 +103,39 @@ pipeline {
                         set -eux
 
                         LATEST_TD_REVISION=$(aws ecs register-task-definition \
-                          --cli-input-json file://aws/task-definition-rendered.json \
-                          --query 'taskDefinition.revision' \
-                          --output text)
+                        --cli-input-json file://aws/task-definition-rendered.json \
+                        --query 'taskDefinition.revision' \
+                        --output text)
 
                         aws ecs update-service \
-                          --cluster "$AWS_ECS_CLUSTER" \
-                          --service "$AWS_ECS_SERVICE_PROD" \
-                          --task-definition "$AWS_ECS_TD_PROD:$LATEST_TD_REVISION"
+                        --cluster "$AWS_ECS_CLUSTER" \
+                        --service "$AWS_ECS_SERVICE_PROD" \
+                        --task-definition "$AWS_ECS_TD_PROD:$LATEST_TD_REVISION"
 
-                        aws ecs wait services-stable \
-                          --cluster "$AWS_ECS_CLUSTER" \
-                          --services "$AWS_ECS_SERVICE_PROD"
+                        if ! aws ecs wait services-stable \
+                        --cluster "$AWS_ECS_CLUSTER" \
+                        --services "$AWS_ECS_SERVICE_PROD"; then
+
+                        echo "Service did not stabilize. Dumping diagnostics..."
+
+                        aws ecs describe-services \
+                            --cluster "$AWS_ECS_CLUSTER" \
+                            --services "$AWS_ECS_SERVICE_PROD"
+
+                        TASKS=$(aws ecs list-tasks \
+                            --cluster "$AWS_ECS_CLUSTER" \
+                            --service-name "$AWS_ECS_SERVICE_PROD" \
+                            --query 'taskArns' \
+                            --output text || true)
+
+                        if [ -n "$TASKS" ]; then
+                            aws ecs describe-tasks \
+                            --cluster "$AWS_ECS_CLUSTER" \
+                            --tasks $TASKS
+                        fi
+
+                        exit 1
+                        fi
                     '''
                 }
             }
