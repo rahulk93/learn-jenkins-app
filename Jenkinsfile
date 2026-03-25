@@ -54,8 +54,12 @@ pipeline {
                     sh '''
                         set -eux
 
-                        apk add --no-cache python3 py3-pip bash
-                        pip3 install --no-cache-dir awscli
+                        apk add --no-cache python3 py3-pip py3-virtualenv bash
+
+                        python3 -m venv /tmp/awsenv
+                        . /tmp/awsenv/bin/activate
+                        pip install --no-cache-dir --upgrade pip
+                        pip install --no-cache-dir awscli
 
                         aws --version
                         docker version
