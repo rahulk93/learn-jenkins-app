@@ -88,7 +88,7 @@ pipeline {
         stage('Deploy to AWS ECS') {
             agent {
                 docker {
-                    image 'amazon/aws-cli:2'
+                    image 'amazon/aws-cli:2.34.16'
                     reuseNode true
                     args '--entrypoint=""'
                 }
