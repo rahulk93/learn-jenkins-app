@@ -24,7 +24,6 @@ pipeline {
             steps {
                 sh '''
                     set -e
-                    ls -la
                     node --version
                     npm --version
                     npm ci
@@ -78,15 +77,10 @@ pipeline {
 
                         sed -i "s|#APP_VERSION#|${REACT_APP_VERSION}|g" aws/task-definition-prod-rendered.json
 
-                        echo "Rendered task definition:"
-                        cat aws/task-definition-prod-rendered.json
-
                         LATEST_TD_ARN=$(aws ecs register-task-definition \
                           --cli-input-json file://aws/task-definition-prod-rendered.json \
                           --query 'taskDefinition.taskDefinitionArn' \
                           --output text)
-
-                        echo "New task definition: ${LATEST_TD_ARN}"
 
                         aws ecs update-service \
                           --cluster ${AWS_ECS_CLUSTER} \
