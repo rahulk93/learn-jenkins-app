@@ -44,6 +44,13 @@ pipeline {
         }
 
         stage('Push Image to ECR') {
+            agent {
+                docker {
+                    image 'my-aws-cli'
+                    reuseNode true
+                    args "-u root -v /var/run/docker.sock:/var/run/docker.sock --entrypoint=''"
+                }
+            }
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'my-aws',
@@ -53,6 +60,7 @@ pipeline {
                     sh '''
                         set -e
                         aws --version
+                        docker version
                         aws ecr get-login-password --region ${AWS_DEFAULT_REGION} \
                           | docker login --username AWS --password-stdin ${AWS_DOCKER_REGISTRY}
                         docker push ${IMAGE_URI}
@@ -62,6 +70,13 @@ pipeline {
         }
 
         stage('Deploy to AWS') {
+            agent {
+                docker {
+                    image 'my-aws-cli'
+                    reuseNode true
+                    args "--entrypoint=''"
+                }
+            }
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'my-aws',
