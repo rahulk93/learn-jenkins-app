@@ -10,7 +10,7 @@
   "containerDefinitions": [
     {
       "name": "learnjenkinsapp",
-      "image": "__IMAGE__",
+      "image": "143555788014.dkr.ecr.ap-southeast-2.amazonaws.com/learnjenkinsapp:#APP_VERSION#",
       "essential": true,
       "portMappings": [
         {
